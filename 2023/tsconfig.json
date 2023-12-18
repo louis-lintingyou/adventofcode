@@ -1,0 +1,10 @@
+{
+    "compilerOptions": {
+        "strict": false,
+        "target": "es5",
+        "moduleDetection": "force",
+        "types": [
+            "node"
+        ],
+    }
+}
