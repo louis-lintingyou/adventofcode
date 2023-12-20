@@ -19,10 +19,42 @@ interface Data {
   a: number;
   s: number;
 }
+type Workflow<T = string> = T | Workflow<T>[];
+
+const stringToWorkflow = (text: string): Workflow => {
+  const i = text.indexOf(':');
+  if (i < 0) {
+    return text;
+  }
+  let length = 0;
+  let j = i + 1;
+  while (true) {
+    const char = text[j];
+    // console.log(char);
+    if (char === ',') {
+      if (!length) {
+        break;
+      } else  {
+        length--;
+        // console.log('length --');
+      }
+    } else if (char === ':') {
+      // console.log('length ++');
+      
+      length ++
+    }
+    j++;
+  }
+
+  if (text[i + 2] === '>' || text[i + 2] === '<') {
+    console.log(text)
+  }
+  return [text.substring(0, i), stringToWorkflow(text.substring(i + 1, j)), stringToWorkflow(text.substring(j + 1))]
+}
 
 const transformData = (text: string): {
   workflows: {
-    [ki: string]: string;
+    [ki: string]: Workflow;
   };
   dataList: Data[]
 } => {
@@ -33,7 +65,7 @@ const transformData = (text: string): {
   const list = text.trim().split('\n\n');
   list[0].split('\n').forEach((row) => {
     const colList = row.split('{');
-    result.workflows[colList[0]] = colList[1].replace('}', '');
+    result.workflows[colList[0]] = stringToWorkflow(colList[1].replace('}', ''));
   });
   list[1].split('\n').forEach((row) => {
     const colList = row.replace('{', '').replace('}', '').split(',');
@@ -52,25 +84,101 @@ const transformData = (text: string): {
   return result;
 }
 
-// px{a<2006:qkq,m>2090:A,rfg}
-// pv{a>1716:R,A}
-// lnx{m>1548:A,A}
-// rfg{s<537:gd,x>2440:R,A}
-// qs{s>3448:A,lnx}
-// qkq{x<1416:A,crn}
-// crn{x>2662:A,R}
-// in{s<1351:px,qqz}
-// qqz{s>2770:qs,m<1801:hdj,R}
-// gd{a>3333:R,R}
-// hdj{m>838:A,pv}
+const part1CalcAccepted = (text: string) => {
+  const workflowsData = transformData(text);
+  const totalList = workflowsData.dataList
+    .filter((data) => {
+      let name = 'in';
+      let workflow = workflowsData.workflows[name];
+      while (name !== 'R' && name !== 'A') {
+        if (Array.isArray(workflow)) {
+          const ifText = workflow[0] as string;
+          const ki = ifText[0] as string;
+          
+          const number = +ifText.substring(2);
+          (ifText[1] === '>' ? data[ki] > number : data[ki] < number)
+            ? (workflow = workflow[1])
+            : (workflow = workflow[2]);
+        } else {
+          name = workflow;
+          workflow = workflowsData.workflows[name];
+        }
+        
+      }
+      return name === 'A'
+    });
+  return totalList.reduce((total, data) => {
+    return total + data.a + data.m + data.s + data.x;
+  }, 0)
+}
 
-// {x=787,m=2655,a=1222,s=2876}
-// {x=1679,m=44,a=2067,s=496}
-// {x=2036,m=264,a=79,s=2244}
-// {x=2461,m=1339,a=466,s=291}
-// {x=2127,m=1623,a=2188,s=1013}
-// 首先列出工作流程，然後是一個空行，然後是精靈希望您排序的部分的評級。所有部分都從名為 的工作流程開始in。在此範例中，列出的五個部分經歷以下工作流程：
+interface RangeData {
+  x: number[];
+  m: number[];
+  a: number[];
+  s: number[];
+}
+const part2CalcCombinations = (text: string) => {
+  const workflowsData = transformData(text);
+  
+  const rangeDataList: RangeData[] = [];
 
+  const findList: {
+    workflow: Workflow;
+    range: RangeData;
+  }[] = [
+    {
+      workflow: workflowsData.workflows['in'],
+      range: {
+        x: [1, 4000],
+        m: [1, 4000],
+        a: [1, 4000],
+        s: [1, 4000],
+      }
+    }
+  ]
+  while (findList.length) {
+    const rangeData = findList.shift();
+    const workflow = rangeData.workflow;
+    // let workflow = workflowsData.workflows[rangeData.workflow];
+    console.log(workflow);
+  
+    if (!workflow) {
+      continue
+    }
+    if (Array.isArray(workflow)) {
+      const ifText = workflow[0] as string;
+      const ki = ifText[0] as string;
+      const number = +ifText.substring(2);
+      if (ifText[1] === '>') {
+        rangeData.range[ki][0] = Math.max(rangeData.range[ki][0], number + 1);
+      } else {
+        rangeData.range[ki][1] = Math.min(rangeData.range[ki][1], number - 1);
+      }
+      findList.push(
+        {
+          workflow: workflow[1],
+          range: JSON.parse(JSON.stringify(rangeData.range))
+        },
+        {
+          workflow: workflow[2],
+          range: JSON.parse(JSON.stringify(rangeData.range))
+        }
+      )
+    } else if (workflow !== 'A' && workflow !== 'R') {
+      findList.push(
+        {
+          workflow: workflowsData.workflows[workflow],
+          range: JSON.parse(JSON.stringify(rangeData.range))
+        }
+      )
+    } else if (workflow === 'A') {
+      rangeDataList.push(rangeData.range);
+    }
+  }
+  console.log(rangeDataList);
+  
+}
 
 const a = `
 px{a<2006:qkq,m>2090:A,rfg}
@@ -91,8 +199,12 @@ hdj{m>838:A,pv}
 {x=2461,m=1339,a=466,s=291}
 {x=2127,m=1623,a=2188,s=1013}
 `;
+// 's<164:a>1424:bp,a,a>1424:bp,a>799:nfc,qvg'
+// console.log(stringToWorkflow('s<164:a>1424:bp,a,a>1424:bp,a>799:nfc,qvg'));
+// console.log(part1CalcAccepted(data));
+console.log(part2CalcCombinations(a));
+// 532551
 
-console.log(transformData(a))
 
 // {x=787,m=2655,a=1222,s=2876}: in-> qqz-> qs-> lnx->A
 // {x=1679,m=44,a=2067,s=496}: in-> px-> rfg-> gd->R
